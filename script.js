@@ -1,12 +1,30 @@
 const CONFIG = {
-      projectName: 'وقف منابع الخير',
+      projectName: 'وقف بناء دار الأيتام',
       charityName: 'جمعية إحياء التراث الإسلامي',
-      branch: 'مركز محافظة الفروانية',
+      branch: 'لجنة الدعوة والإرشاد',
       charityWhatsapp: '96596690217',
       whatsappCtaNumber: '96690217',
       appsScriptUrl: 'https://script.google.com/macros/s/AKfycbyxxkI3k4vuTaQIPEsVIaOhDI4avp7Ji8iPeMkdEJZGAlfcAP5tfLZyYo547bVzVE2D0w/exec',
       logoUrl: logoBase64Data
     };
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyD8UWWhGj8fibp8FXE0LOG60rYI4_RfuhI",
+      authDomain: "ehdaa-charity.firebaseapp.com",
+      databaseURL: "https://ehdaa-charity-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "ehdaa-charity",
+      storageBucket: "ehdaa-charity.firebasestorage.app",
+      messagingSenderId: "507588211763",
+      appId: "1:507588211763:web:0d499b7c4d9cdaabdfdf46"
+    };
+    
+    let db = null;
+    if (firebaseConfig.apiKey !== "REPLACE_WITH_API_KEY" && typeof firebase !== 'undefined') {
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+      db = firebase.database();
+    }
 
     const els = {
       formMode: document.getElementById('formMode'),
@@ -76,19 +94,15 @@ const CONFIG = {
     }
 
     async function loadGiftById(giftId) {
-      const response = await fetch(`${CONFIG.appsScriptUrl}?action=get&id=${encodeURIComponent(giftId)}`);
-      const result = await response.json();
-      if (!result.ok || !result.data) {
-        throw new Error(result.error || 'not_found');
+      if (!db) {
+        throw new Error('Firebase is not configured');
       }
-
-      const row = result.data;
-      return {
-        recipientName: row['اسم المهدى اليه'] || '—',
-        giftMessage: row['نص الريساله'] || '—',
-        donorName: row['اسم المتبرع'] || '—',
-        dateLabel: formatArabicDate(row['تاريخ ووقت الانشاء'])
-      };
+      const snapshot = await db.ref('gifts/' + giftId).once('value');
+      const data = snapshot.val();
+      if (!data) {
+        throw new Error('Gift not found');
+      }
+      return data;
     }
 
     function makeWhatsappUrl(phone, text) {
@@ -513,22 +527,54 @@ const CONFIG = {
       }
     }
 
+    function generateShortId() {
+      return Math.random().toString(36).substring(2, 8).toUpperCase();
+    }
+
     async function sendWhatsapp(e) {
       if (e) e.preventDefault();
 
       const data = typeof getPayload === 'function' ? getPayload() : {};
       if (!validateForm()) return;
 
-      // Render preview asynchronously (no await here to prevent iOS Safari popup blocker)
       renderPreview(data).catch(err => console.error(err));
 
-      const compressedData = LZString.compressToEncodedURIComponent(JSON.stringify(data));
-      
+      const btn = els.whatsappBtn;
+      let originalText = '';
+      if (btn) {
+        originalText = btn.innerHTML;
+        btn.classList.add('loading');
+        btn.innerHTML = 'جاري التجهيز...';
+      }
+
+      let giftId = '';
       const url = new URL(window.location.href);
-      url.searchParams.set('id', compressedData);
+
+      if (db) {
+        giftId = generateShortId();
+        try {
+          await db.ref('gifts/' + giftId).set(data);
+          url.searchParams.set('id', giftId);
+        } catch (err) {
+          console.error("Firebase save error:", err);
+          alert('حدث خطأ أثناء حفظ الإهداء في قاعدة البيانات. تأكد من إعدادات Firebase.');
+          const compressedData = LZString.compressToEncodedURIComponent(JSON.stringify(data));
+          url.searchParams.set('id', compressedData);
+        }
+      } else {
+        const compressedData = LZString.compressToEncodedURIComponent(JSON.stringify(data));
+        url.searchParams.set('id', compressedData);
+        console.warn('Firebase is not configured, falling back to long URL.');
+      }
+
       const giftUrl = url.toString();
+
+      if (btn) {
+        btn.classList.remove('loading');
+        btn.innerHTML = originalText;
+      }
       
-      const textMessage = 'لقد وصلتك هدية 🎁\nاضغط على الرابط لمعاينتها:\n';
+      const textMessage = 'لقد وصلتك هدية 🎁\nمن فضلك اضغط على الرابط لمشاهدة تفاصيل الإهداء :\n';
 
       const whatsappApiUrl = data.recipientPhone 
         ? makeWhatsappUrl(data.recipientPhone, textMessage + giftUrl)
@@ -538,7 +584,7 @@ const CONFIG = {
         try {
           await navigator.share({
             title: 'إهداء',
-            text: textMessage,
+            text: 'لقد وصلتك هدية 🎁\nمن فضلك اضغط على الرابط لمشاهدة تفاصيل الإهداء :',
             url: giftUrl
           });
         } catch (error) {
