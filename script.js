@@ -574,18 +574,25 @@ const CONFIG = {
         btn.innerHTML = originalText;
       }
       
-      const textMessage = 'لقد وصلتك هدية 🎁\nمن فضلك اضغط على الرابط لمشاهدة تفاصيل الإهداء :\n';
+      const donorNameStr = data.donorName ? data.donorName : 'أحد محبيك';
+      const recipientNameStr = data.recipientName ? data.recipientName : '';
+      const projectNameStr = CONFIG.projectName || 'وقف منابع الخير';
+      const charityNameStr = CONFIG.charityName || 'جمعية إحياء التراث الإسلامي';
+      
+      const textMessage = `السلام عليكم ورحمة الله وبركاته 🌷\n\nإلى الغالي ${recipientNameStr}، \n يهديك ${donorNameStr} \nأجر تبرعه في ${projectNameStr}. \nنسأل الله أن يكتب لكما الأجر 🤲\n\nلمشاهدة بطاقة الإهداء يرجى الضغط على الرابط التالي:\n `;
+
+      const finalWhatsappText = textMessage + giftUrl + `\n\nإخوانكم في ${charityNameStr}`;
 
       const whatsappApiUrl = data.recipientPhone 
-        ? makeWhatsappUrl(data.recipientPhone, textMessage + giftUrl)
-        : `https://wa.me/?text=${encodeURIComponent(textMessage + giftUrl)}`;
+        ? makeWhatsappUrl(data.recipientPhone, finalWhatsappText)
+        : `https://wa.me/?text=${encodeURIComponent(finalWhatsappText)}`;
 
       if (navigator.share && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
         try {
           await navigator.share({
             title: 'إهداء',
-            text: 'لقد وصلتك هدية 🎁\nمن فضلك اضغط على الرابط لمشاهدة تفاصيل الإهداء :',
-            url: giftUrl
+            text: `السلام عليكم ورحمة الله وبركاته 🌷\n\nإلى الغالي ${recipientNameStr}، \n يهديك ${donorNameStr} \nأجر تبرعه في ${projectNameStr}. \nنسأل الله أن يكتب لكما الأجر 🤲\n\nلمشاهدة بطاقة الإهداء يرجى الضغط على الرابط التالي:\n `,
+            url: giftUrl + `\n\nإخوانكم في ${charityNameStr}`
           });
         } catch (error) {
           console.log('Share failed or canceled, falling back to WhatsApp');
