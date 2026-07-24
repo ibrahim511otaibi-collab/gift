@@ -1,7 +1,7 @@
 const CONFIG = {
-      projectName: 'وقف بناء دار الأيتام',
+      projectName: 'وقف منابع الخير',
       charityName: 'جمعية إحياء التراث الإسلامي',
-      branch: 'لجنة الدعوة والإرشاد',
+      branch: 'مركز محافظة الفروانية',
       charityWhatsapp: '96596690217',
       whatsappCtaNumber: '96690217',
       appsScriptUrl: 'https://script.google.com/macros/s/AKfycbyxxkI3k4vuTaQIPEsVIaOhDI4avp7Ji8iPeMkdEJZGAlfcAP5tfLZyYo547bVzVE2D0w/exec',
@@ -450,11 +450,15 @@ const CONFIG = {
       try {
         const hasIdParam = new URLSearchParams(window.location.search).has('id');
         const liveData = hasIdParam ? null : getPayload();
-        if (liveData && !validateForm()) {
-          btn.classList.remove('loading');
-          return;
+        if (!hasIdParam) {
+          // Only validate and re-render if user is filling the form
+          if (!validateForm()) {
+            if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
+            return;
+          }
+          await renderCertificate(liveData);
         }
-        await renderCertificate(liveData);
+        // If hasIdParam is true, the card is already rendered by initFromUrl, skip renderCertificate
 
         const cardElement = document.getElementById('certificateCard') || document.querySelector('.gift-card');
         if (!cardElement) throw new Error('Gift card element not found');
@@ -507,7 +511,7 @@ const CONFIG = {
         pdf.save('بطاقة_إهداء_وقف_منابع_الخير.pdf');
       } catch (error) {
         console.error('Download error:', error);
-        alert('حدث خطأ أثناء تحميل البطاقة.');
+        alert('حدث خطأ أثناء تحميل البطاقة:\n' + error.message);
       } finally {
         if (btn) {
           btn.disabled = false;
